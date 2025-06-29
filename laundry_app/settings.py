@@ -1,13 +1,28 @@
+# settings.py
+
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
+# ATENCIÓN: Se añade la carga de variables de entorno desde un archivo .env
+# Esto debe estar al principio para que las variables estén disponibles.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
-SECRET_KEY = 'your-secret-key'  # Cambia esto por una clave segura
 
-DEBUG = True
+# ATENCIÓN: La SECRET_KEY se obtiene de forma segura desde las variables de entorno.
+# El valor original se deja como respaldo solo para desarrollo si el .env no existe.
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'your-secret-key')
 
-ALLOWED_HOSTS = []
+# ATENCIÓN: DEBUG debe ser False en producción. Se controla con una variable de entorno.
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ['true', '1', 't']
+
+# ATENCIÓN: Añade la IP de tu servidor y tu dominio a las hosts permitidos.
+# Se controla con una variable de entorno que puede contener una lista separada por comas.
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+
+
+# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -50,12 +65,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'laundry_app.wsgi.application'
 
+
+# ATENCIÓN: Configuración de la Base de Datos para PostgreSQL en producción.
+# Las credenciales se leen de forma segura desde las variables de entorno.
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('POSTGRES_DB'),
+        'USER': os.getenv('POSTGRES_USER'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
+        'HOST': os.getenv('POSTGRES_HOST', 'db'), # 'db' es el nombre del servicio en docker-compose
+        'PORT': os.getenv('POSTGRES_PORT', '5432'),
     }
 }
+
+
+# Password validation
+# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -72,6 +98,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+
+# Internationalization
+# https://docs.djangoproject.com/en/4.2/topics/i18n/
+
 LANGUAGE_CODE = 'es-es'
 
 TIME_ZONE = 'UTC'
@@ -80,14 +110,32 @@ USE_I18N = True
 
 USE_TZ = True
 
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/4.2/howto/static-files/
+
 STATIC_URL = 'static/'
 
+# Directorio donde el servidor de desarrollo busca archivos estáticos.
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
+# ATENCIÓN: Directorio donde 'collectstatic' reunirá todos los archivos estáticos para producción.
+# Nginx servirá los archivos desde este directorio.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+
+# Media files (Archivos subidos por el usuario)
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+
+# ATENCIÓN: Directorio para los archivos subidos por los usuarios en producción.
+# Se alinea con el volumen de Docker definido en docker-compose.yml.
+MEDIA_ROOT = BASE_DIR / 'mediafiles'
+
+
+# Default primary key field type
+# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
