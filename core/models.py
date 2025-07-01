@@ -133,11 +133,16 @@ class Order(models.Model):
     category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Categoría de Producto")
 
     def save(self, *args, **kwargs):
-        # Esta línea mágica pregunta: "¿Este pedido es nuevo y no tiene un short_id?"
+        # Genera un short_id para la URL pública si no existe
         if not self.short_id:
-            # Si la respuesta es sí, llama a nuestra "máquina" para que le genere uno.
             self.short_id = generate_short_id()
-        # Finalmente, guarda el pedido (con su nuevo código si era nuevo).
+        
+        # --- LÓGICA AÑADIDA ---
+        # Genera un order_code legible para el usuario si no existe
+        if not self.order_code:
+            self.order_code = self.generate_order_code()
+        # --- FIN DE LÓGICA AÑADIDA ---
+
         super().save(*args, **kwargs)
 
     def generate_order_code(self):

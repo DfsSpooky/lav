@@ -715,11 +715,72 @@ def download_order_pdf(request, order_id):
 
 @login_required
 def payment_audit(request):
-    orders = Order.objects.filter(payment_status__in=['PENDING', 'PARTIAL']).order_by('-created_at')
-    paginator = Paginator(orders, 10)
+    """
+    Vista mejorada para la auditoría de pagos que calcula totales,
+    maneja filtros y alimenta la plantilla avanzada.
+    """
+    # Se obtienen los parámetros del filtro desde la URL (GET)
+    date_from_str = request.GET.get('date_from')
+    date_to_str = request.GET.get('date_to')
+    payment_status_filter = request.GET.get('payment_status')
+
+    # Queryset base: todos los pedidos para calcular los ingresos del día.
+    orders_today = Order.objects.filter(created_at__date=date.today())
+    
+    # Queryset para la tabla principal: por defecto, solo los que tienen deuda.
+    orders_list = Order.objects.filter(payment_status__in=['PENDING', 'PARTIAL']).select_related('customer').order_by('-created_at')
+
+    # --- Aplicación de Filtros ---
+    if date_from_str:
+        orders_list = orders_list.filter(created_at__date__gte=date_from_str)
+    if date_to_str:
+        orders_list = orders_list.filter(created_at__date__lte=date_to_str)
+    
+    # El filtro de estado de pago puede incluir 'Pagado', así que lo aplicamos aquí.
+    # Si el usuario filtra por 'PAID', la lista principal se sobrescribe.
+    if payment_status_filter:
+        if payment_status_filter == 'PAID':
+            # Si se pide ver los pagados, se redefine el queryset.
+            orders_list = Order.objects.filter(payment_status='PAID').select_related('customer').order_by('-created_at')
+        else:
+            orders_list = orders_list.filter(payment_status=payment_status_filter)
+
+    # --- Cálculos para las Tarjetas de Resumen ---
+    
+    # 1. Deuda Total Pendiente (solo de los pedidos con deuda)
+    pending_orders_qs = Order.objects.filter(payment_status__in=['PENDING', 'PARTIAL'])
+    final_price_expr = F('original_calculated_price') - F('discount_amount')
+    total_due_agg = pending_orders_qs.annotate(
+        remaining=Case(
+            When(payment_status='PARTIAL', then=final_price_expr - F('partial_amount')),
+            When(payment_status='PENDING', then=final_price_expr),
+            default=Decimal('0.0'),
+            output_field=DecimalField()
+        )
+    ).aggregate(total=Coalesce(Sum('remaining'), Decimal('0.0')))
+    total_due = total_due_agg['total']
+
+    # 2. Ingresos del día (considera pagos completos y parciales del día)
+    today_income_agg = orders_today.filter(payment_status__in=['PAID', 'PARTIAL']).aggregate(
+        total=Coalesce(Sum(final_price_expr), Decimal('0.0'))
+    )
+    today_income = today_income_agg['total']
+    
+    # 3. Cantidad de pedidos con deuda
+    pending_payment_orders_count = pending_orders_qs.count()
+
+    # --- Paginación ---
+    paginator = Paginator(orders_list, 10)
     page_number = request.GET.get('page')
-    page = paginator.get_page(page_number)
-    return render(request, 'core/payment_audit.html', {'orders': page})
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'orders': page_obj,
+        'total_due': total_due,
+        'today_income': today_income,
+        'pending_payment_orders_count': pending_payment_orders_count,
+    }
+    return render(request, 'core/payment_audit.html', context)
 
 @login_required
 def cancel_order(request, order_id):
@@ -1004,28 +1065,32 @@ def sale_receipt_pdf(request, sale_id):
 # ==============================================================================
 
 @login_required
-@login_required
 def print_order_ticket(request, order_id):
     """
-    Prepara los datos para el ticket de un pedido específico.
-    Esta vista genera el enlace seguro para el QR y para WhatsApp usando el 'short_id'.
+    Prepara los datos para el ticket, incluyendo un estado de pago claro
+    y un mensaje de WhatsApp dinámico.
     """
     try:
-        # Buscamos el pedido por su ID normal, que viene de la URL interna de la app.
-        order = Order.objects.get(id=order_id)
-        
-        # Obtenemos la configuración de la app (nombre del negocio, etc.)
+        order = get_object_or_404(Order, id=order_id)
         app_config_qs = AppConfiguration.objects.all()
         app_config = {c.key: c.value for c in app_config_qs}
-
-        # --- ¡AQUÍ ESTÁ LA MAGIA! ---
-        # 1. Creamos la URL segura usando el 'short_id' del pedido.
-        #    reverse('order_status', ...) busca la URL con name='order_status'
-        #    y le pasa el short_id como argumento.
+        
         qr_url = request.build_absolute_uri(reverse('order_status', args=[order.short_id]))
-
-        # 2. Preparamos el enlace de WhatsApp (si el cliente tiene teléfono)
         whatsapp_link = ""
+
+        # --- INICIO DE LA LÓGICA DE ESTADO DE PAGO ---
+        
+        # 1. Determinar el texto de estado para el ticket y el mensaje
+        remaining_amount = order.remaining_amount()
+        if remaining_amount <= 0:
+            payment_status_text = "CANCELADO"
+            payment_status_details = "El pedido ha sido completamente pagado. ¡Gracias!"
+        else:
+            payment_status_text = f"DEBE S/ {remaining_amount:.2f}"
+            payment_status_details = f"El pago pendiente es de *S/ {remaining_amount:.2f}*."
+
+        # --- FIN DE LA LÓGICA ---
+
         if order.customer.phone:
             phone_number = order.customer.phone.strip().replace(" ", "")
             if not phone_number.startswith('51'):
@@ -1033,21 +1098,24 @@ def print_order_ticket(request, order_id):
 
             business_name = app_config.get('business_name', 'tu lavandería')
             
-            # El mensaje ahora incluye la nueva URL corta y segura.
+            # 2. Construir el nuevo mensaje de WhatsApp dinámico
             message_text = (
                 f"Hola {order.customer.name}, aquí tienes el resumen de tu pedido #{order.order_code} en *{business_name}*.\n\n"
-                f"Total: *S/ {order.total_price:.2f}*\n\n"
-                f"Puedes ver el estado de tu pedido en cualquier momento aquí:\n{qr_url}"
+                f"Total del Pedido: *S/ {order.total_price:.2f}*\n"
+                f"Estado del Pago: *{payment_status_text}*\n\n"
+                f"{payment_status_details}\n\n"
+                f"Puedes ver el estado de tu pedido aquí:\n{qr_url}"
             )
             encoded_message = quote(message_text)
             whatsapp_link = f"https://wa.me/{phone_number}?text={encoded_message}"
 
-        # 3. Pasamos todos los datos a la plantilla del ticket.
         context = {
             'order': order,
             'app_config': app_config,
             'qr_url': qr_url,
             'whatsapp_link': whatsapp_link,
+            # Pasamos la nueva variable a la plantilla para que también la use
+            'payment_status_text': payment_status_text,
         }
         return render(request, 'core/order_ticket.html', context)
         
@@ -1459,33 +1527,46 @@ def customer_list(request):
 
     if customer_filter_form.is_valid():
         search_query = customer_filter_form.cleaned_data.get('search_query')
-        order_status = customer_filter_form.cleaned_data.get('order_status')
-        payment_status = customer_filter_form.cleaned_data.get('payment_status')
         if search_query:
             customer_list_qs = customer_list_qs.filter(
-                Q(name__icontains=search_query) | Q(customer_code__icontains=search_query) | Q(phone__icontains=search_query)
+                Q(name__icontains=search_query) |
+                Q(customer_code__icontains=search_query) |
+                Q(phone__icontains=search_query)
             )
-        if order_status: customer_list_qs = customer_list_qs.filter(order__status=order_status).distinct()
-        if payment_status: customer_list_qs = customer_list_qs.filter(order__payment_status=payment_status).distinct()
+
+        order_query = customer_filter_form.cleaned_data.get('order_query')
+        if order_query:
+            order_q_object = Q(order__order_code__icontains=order_query)
+            if order_query.isdigit():
+                order_q_object.add(Q(order__id=int(order_query)), Q.OR)
+            customer_list_qs = customer_list_qs.filter(order_q_object).distinct()
+
+        order_status = customer_filter_form.cleaned_data.get('order_status')
+        if order_status: 
+            customer_list_qs = customer_list_qs.filter(order__status=order_status).distinct()
+        
+        payment_status = customer_filter_form.cleaned_data.get('payment_status')
+        if payment_status: 
+            customer_list_qs = customer_list_qs.filter(order__payment_status=payment_status).distinct()
 
     ninety_days_ago = today - timedelta(days=90)
     seven_days_ago = today - timedelta(days=7)
     
-    # --- CORRECCIÓN APLICADA AQUÍ ---
+    # --- PRIMERA CORRECCIÓN AQUÍ ---
     top_customer_ids = list(Customer.objects.annotate(
-        total_spent=Coalesce(Sum(
-            (F('order__original_calculated_price') - F('order__discount_amount')),
-            filter=~Q(order__status='CANCELLED') # Excluir anulados
-        ), Decimal('0.0'))
+        total_spent=(
+            Coalesce(Sum('order__original_calculated_price', filter=~Q(order__status='CANCELLED')), Decimal('0.0')) -
+            Coalesce(Sum('order__discount_amount', filter=~Q(order__status='CANCELLED')), Decimal('0.0'))
+        )
     ).order_by('-total_spent').values_list('id', flat=True)[:5])
 
-    # --- CORRECCIÓN APLICADA AQUÍ ---
+    # --- SEGUNDA CORRECCIÓN AQUÍ ---
     customer_list_annotated = customer_list_qs.annotate(
         latest_order_date=Max('order__created_at'),
-        total_spent=Coalesce(Sum(
-            (F('order__original_calculated_price') - F('order__discount_amount')),
-            filter=~Q(order__status='CANCELLED') # Excluir anulados
-        ), Decimal('0.0')),
+        total_spent=(
+            Coalesce(Sum('order__original_calculated_price', filter=~Q(order__status='CANCELLED')), Decimal('0.0')) -
+            Coalesce(Sum('order__discount_amount', filter=~Q(order__status='CANCELLED')), Decimal('0.0'))
+        ),
         is_new=Case(When(created_at__gte=seven_days_ago, then=Value(True)), default=Value(False), output_field=BooleanField()),
         is_inactive=Case(
             When(latest_order_date__isnull=True, then=Value(False)),

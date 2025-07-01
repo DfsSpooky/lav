@@ -42,7 +42,7 @@
             <table class="w-full text-sm text-left text-gray-500">
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                     <tr>
-                        <th class="px-6 py-3">ID</th>
+                        <th class="px-6 py-3">N° de Pedido</th>
                         <th class="px-6 py-3">Estado</th>
                         <th class="px-6 py-3 hidden sm:table-cell">Total</th>
                         <th class="px-6 py-3 hidden md:table-cell">Deuda</th>
@@ -53,7 +53,10 @@
                 <tbody>
                     {% for order in orders %}
                     <tr class="bg-white border-b hover:bg-gray-50">
-                        <td class="px-6 py-4 font-medium text-gray-900">#{{ order.id }}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">
+                            <div>{{ order.order_code }}</div>
+                            <div class="text-xs text-gray-400">ID: #{{ order.id }}</div>
+                        </td>
                         <td class="px-6 py-4">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                 {% if order.status == 'READY' %} bg-green-100 text-green-800 
@@ -110,7 +113,7 @@
             <table class="w-full text-sm text-left text-gray-600">
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                     <tr>
-                        <th class="px-4 py-2">Pedido ID</th>
+                        <th class="px-4 py-2">N° de Pedido</th>
                         <th class="px-4 py-2">Fecha</th>
                         <th class="px-4 py-2 text-right">Monto de Deuda</th>
                         <th class="px-4 py-2 text-center">Acciones Rápidas</th> </tr>
@@ -119,7 +122,10 @@
                     {% for order in orders %}
                         {% if order.remaining_amount > 0 %}
                             <tr>
-                                <td class="px-4 py-3 font-medium text-gray-900">#{{ order.id }}</td>
+                                <td class="px-4 py-3 font-medium text-gray-900">
+                                    <div>{{ order.order_code }}</div>
+                                    <div class="text-xs text-gray-400">ID: #{{ order.id }}</div>
+                                </td>
                                 <td class="px-4 py-3">{{ order.created_at|date:"d M, Y" }}</td>
                                 <td class="px-4 py-3 font-bold text-red-600 text-right">S/ {{ order.remaining_amount|floatformat:2 }}</td>
                                 <td class="px-4 py-3 text-center">

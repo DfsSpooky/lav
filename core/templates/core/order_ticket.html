@@ -2,148 +2,113 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ticket Pedido #{{ order.order_code|default:order.id }}</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* Estilos para una impresora de tickets de 80mm */
-        body {
-            font-family: 'Courier New', Courier, monospace;
-            width: 302px; /* Ancho para ticket de 80mm */
-            margin: 0 auto;
-        }
-        .ticket {
-            background-color: #fff;
-            padding: 20px;
-        }
-        .header, .footer {
-            text-align: center;
-        }
-        .item-list {
-            border-top: 1px dashed #000;
-            border-bottom: 1px dashed #000;
-            padding: 10px 0;
-            margin: 10px 0;
-        }
-        .item {
-            display: flex;
-            justify-content: space-between;
-        }
-        .total {
-            display: flex;
-            justify-content: space-between;
-            font-weight: bold;
-            font-size: 1.1em;
-            margin-top: 10px;
-        }
-        #qr-code {
-            display: flex;
-            justify-content: center;
+        @import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap');
+        body { font-family: 'Inconsolata', monospace; width: 302px; margin: 0 auto; color: #000; }
+        .ticket { background: #fff; padding: 15px; }
+        .header, .footer { text-align: center; }
+        .header h2 { font-size: 1.2rem; font-weight: bold; margin: 0; }
+        .info { font-size: 0.8rem; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
+        .item-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; }
+        .item-table th, .item-table td { padding: 4px 0; }
+        .item-table .item { text-align: left; }
+        .item-table .price { text-align: right; }
+        .totals { margin-top: 10px; font-size: 0.9rem; border-top: 1px solid #000; padding-top: 5px; }
+        .totals .row .label { text-align: left; }
+        .totals .row .value { text-align: right; font-weight: bold; }
+        
+        /* --- ESTILOS AÑADIDOS PARA EL ESTADO DEL PAGO --- */
+        .payment-status-box {
             margin-top: 15px;
-        }
-        .label-section {
-            border-top: 2px dashed #000;
-            margin-top: 25px;
-            padding-top: 15px;
+            padding: 8px;
+            border-radius: 4px;
             text-align: center;
+            font-size: 1.1rem;
+            font-weight: bold;
+            letter-spacing: 1px;
         }
-        .no-print {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            display: flex;
-            flex-direction: column; /* Apila los botones verticalmente */
-            gap: 8px; /* Espacio entre botones */
+        .status-paid {
+            background-color: #d1fae5; /* Verde claro */
+            color: #065f46; /* Verde oscuro */
+            border: 1px solid #6ee7b7;
         }
-        .no-print a, .no-print button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px; /* Espacio entre ícono y texto */
+        .status-due {
+            background-color: #fee2e2; /* Rojo claro */
+            color: #991b1b; /* Rojo oscuro */
+            border: 1px solid #fca5a5;
         }
+        /* --- FIN DE ESTILOS AÑADIDOS --- */
 
-        /* Estilos específicos para la impresión */
-        @media print {
-            body {
-                width: 100%; /* El navegador ajustará el ancho */
-            }
-            .no-print {
-                display: none;
-            }
-            .ticket {
-                padding: 0;
-            }
-        }
+        .qr-code { margin-top: 15px; }
+        .print-button { width: 100%; padding: 10px; background-color: #4a4a4a; color: white; border: none; margin-top: 20px; cursor: pointer; font-weight: bold; }
+        @media print { .no-print { display: none; } body { margin: 0; } }
     </style>
 </head>
 <body class="bg-gray-200">
 
     <div class="ticket">
-        <div class="header">
-            <h1 class="text-xl font-bold">{{ app_config.business_name|default:'Mi Lavandería' }}</h1>
+        <header class="header">
+            <h2>{{ app_config.business_name|default:'Mi Lavandería' }}</h2>
             <p class="text-xs">{{ app_config.business_address|default:'Dirección no configurada' }}</p>
-            <p class="text-xs">Tel: {{ app_config.business_phone|default:'' }}</p>
-            <p class="text-sm font-semibold mt-2">Pedido: #{{ order.order_code|default:order.id }}</p>
-        </div>
+            <p class="text-xs">Tel: {{ app_config.business_phone|default:'Sin teléfono' }}</p>
+        </header>
 
-        <div class="mt-4 text-sm">
+        <section class="info">
+            <p><strong>Pedido:</strong> #{{ order.order_code|default:order.id }}</p>
             <p><strong>Fecha:</strong> {{ order.created_at|date:"d/m/Y H:i" }}</p>
-            <p><strong>Cliente:</strong> {{ order.customer.name }}</p>
-        </div>
+            <div>
+                <p><strong>Cliente:</strong> {{ order.customer.name }}</p>
+                <p><strong>Código Cliente:</strong> {{ order.customer.customer_code }}</p>
+            </div>
+        </section>
 
-        <div class="item-list text-sm">
-            {% for item in order.items.all %}
-                <div class="item">
-                    <span>{{ item.quantity }} x {{ item.service.name }}</span>
-                    <span>S/ {{ item.subtotal|floatformat:2 }}</span>
+        <section>
+            <table class="item-table">
+                <thead><tr><th class="item">Descripción</th><th class="price">Monto</th></tr></thead>
+                <tbody>
+                    {% if order.weight and order.weight > 0 %}
+                    <tr><td class="item">Lavado por Peso ({{ order.weight }} kg)</td><td class="price">S/ {{ order.weight_total_price|floatformat:2 }}</td></tr>
+                    {% endif %}
+                    {% for item in order.ordercategory_set.all %}
+                    <tr><td class="item">{{ item.category.name }} (x{{ item.quantity }})</td><td class="price">S/ {{ item.price|floatformat:2 }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <section class="totals">
+            <div class="flex justify-between row text-lg mt-2 pt-2 border-t border-dashed"><span class="label">TOTAL:</span><span class="value">S/ {{ order.total_price|floatformat:2 }}</span></div>
+            {% if order.partial_amount > 0 %}<div class="flex justify-between row"><span class="label">Adelanto ({{ order.get_payment_method_display }}):</span><span class="value">- S/ {{ order.partial_amount|floatformat:2 }}</span></div>{% endif %}
+            
+            {% if order.remaining_amount <= 0 %}
+                <div class="payment-status-box status-paid">
+                    CANCELADO
                 </div>
-            {% endfor %}
-        </div>
+            {% else %}
+                <div class="payment-status-box status-due">
+                    DEBE: S/ {{ order.remaining_amount|floatformat:2 }}
+                </div>
+            {% endif %}
+            </section>
 
-        <div class="total text-base">
-            <span>TOTAL:</span>
-            <span>S/ {{ order.total_price|floatformat:2 }}</span>
-        </div>
-        
-        <div class="footer mt-4">
-            <p class="font-bold">¡Escanea para ver el estado!</p>
-            <div id="qr-code"></div>
-            <p class="text-xs mt-2">{{ qr_url }}</p>
-            <p class="text-xs mt-4">Gracias por tu preferencia.</p>
-        </div>
-
-        <div class="label-section">
-            <h2 class="font-bold text-lg">ETIQUETA PARA PRENDA</h2>
-            <p class="text-2xl font-bold my-2">#{{ order.order_code|default:order.id }}</p>
-            <p class="text-lg">{{ order.customer.name }}</p>
-        </div>
+        <footer class="footer">
+            <p class="text-xs mt-4">¡Gracias por su preferencia!</p>
+            <div class="qr-code">
+                <p class="text-xs mb-2">Consulte el estado de su pedido:</p>
+                <img src="{{ order.qr_code.url }}" alt="Código QR del Pedido" class="mx-auto" style="width: 120px; height: 120px;">
+            </div>
+        </footer>
     </div>
     
-    <div class="no-print">
-        <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-blue-700">
-            <i class="fas fa-print"></i> Imprimir
-        </button>
-        
+    <div class="text-center no-print mt-4">
+        <button onclick="window.print()" class="print-button"><i class="fas fa-print mr-2"></i>IMPRIMIR TICKET</button>
         {% if whatsapp_link %}
-            <a href="{{ whatsapp_link }}" 
-               target="_blank" 
-               class="bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-green-600"
-               title="Enviar por WhatsApp al cliente">
-                <i class="fab fa-whatsapp"></i> Enviar
-            </a>
+            <a href="{{ whatsapp_link }}" target="_blank" class="block w-full bg-green-500 text-white p-3 no-underline font-bold mt-2"><i class="fab fa-whatsapp mr-2"></i>Enviar por WhatsApp</a>
         {% endif %}
     </div>
 
-    <script type="text/javascript">
-        // Generar el código QR con la URL que pasamos desde la vista
-        new QRCode(document.getElementById("qr-code"), {
-            text: "{{ qr_url }}",
-            width: 128,
-            height: 128,
-            correctLevel : QRCode.CorrectLevel.H
-        });
-    </script>
 </body>
 </html>

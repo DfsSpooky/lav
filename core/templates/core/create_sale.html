@@ -93,6 +93,15 @@
                 <span class="font-bold text-gray-700">Total a Pagar:</span>
                 <span id="modal-total-amount" class="font-bold text-blue-600"></span>
             </div>
+            
+            <div class="pt-3 border-t">
+                <label for="cash-received-input" class="text-gray-600">Monto Recibido (S/):</label>
+                <input type="number" id="cash-received-input" step="0.10" placeholder="Ej: 100.00" class="mt-1 block w-full text-right p-2 border rounded-lg text-lg font-bold">
+            </div>
+            <div class="flex justify-between text-2xl font-bold text-green-600 bg-green-50 p-3 rounded-lg">
+                <span>VUELTO:</span>
+                <span id="change-due-display">S/ 0.00</span>
+            </div>
         </div>
 
         <div class="flex justify-end space-x-4 mt-6">
@@ -122,6 +131,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmationModal = document.getElementById('confirmation-modal');
     const confirmSaleButton = document.getElementById('confirm-sale-btn');
     const cancelModalButton = document.getElementById('cancel-modal-btn');
+    const cashReceivedInput = document.getElementById('cash-received-input');
+    const changeDueDisplay = document.getElementById('change-due-display');
     
     let cart = {}; // Objeto que guarda el estado del carrito
 
@@ -208,6 +219,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // --- CÁLCULO DE VUELTO ---
+    cashReceivedInput.addEventListener('input', function() {
+        const totalText = document.getElementById('modal-total-amount').textContent;
+        const totalAmount = parseFloat(totalText.replace('S/ ', '')) || 0;
+        const cashReceived = parseFloat(this.value) || 0;
+        
+        let change = cashReceived - totalAmount;
+        if (change < 0 || isNaN(change)) {
+            change = 0;
+        }
+        
+        changeDueDisplay.textContent = `S/ ${change.toFixed(2)}`;
+    });
+
     // --- LÓGICA DE ENVÍO Y MODAL ---
     saleForm.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -222,6 +247,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('modal-customer-name').textContent = customerSelect.options[customerSelect.selectedIndex]?.text || "Venta de Mostrador";
         document.getElementById('modal-payment-method').textContent = paymentSelect.options[paymentSelect.selectedIndex].text;
         document.getElementById('modal-total-amount').textContent = cartTotalEl.textContent;
+        
+        // Limpiar campos de vuelto
+        cashReceivedInput.value = '';
+        changeDueDisplay.textContent = 'S/ 0.00';
 
         confirmationModal.classList.remove('hidden');
     });

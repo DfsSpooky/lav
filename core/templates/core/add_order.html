@@ -57,11 +57,6 @@
     </form>
 </div>
 
-<!-- ============================================================================== -->
-<!-- MODALES REDISEÑADOS -->
-<!-- ============================================================================== -->
-
-<!-- Modal 1: Ajuste de Precio -->
 <div id="priceModal" class="modal fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 hidden z-40">
     <div class="bg-white rounded-lg shadow-2xl w-full max-w-md text-center p-8">
         <div class="text-blue-500 mb-4"><i class="fas fa-calculator fa-4x"></i></div>
@@ -74,7 +69,6 @@
                 <p id="calculatedPrice" class="text-3xl font-bold text-gray-900">S/ 0.00</p>
             </div>
             
-            <!-- INICIO DEL CAMBIO -->
             <div>
                 <label for="adjustedPriceInput" class="block text-sm font-medium text-gray-700">Ajustar Precio Final (Opcional)</label>
                 <div class="mt-1 relative rounded-md shadow-sm">
@@ -84,8 +78,6 @@
                     <input type="number" step="0.01" id="adjustedPriceInput" class="block w-full rounded-md border-gray-300 pl-8 pr-4 py-2 focus:border-blue-500 focus:ring-blue-500 sm:text-lg" placeholder="0.00">
                 </div>
             </div>
-            <!-- FIN DEL CAMBIO -->
-
         </div>
         
         <div class="flex justify-end space-x-3">
@@ -95,7 +87,6 @@
     </div>
 </div>
 
-<!-- Modal 2: Registrar Pago -->
 <div id="paymentModal" class="modal fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
     <form id="paymentForm">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-8">
@@ -104,6 +95,17 @@
                 <h3 class="text-2xl font-bold text-gray-800">Registrar Pago</h3>
                 <p class="text-sm font-medium text-gray-500 mt-2">Monto Total a Pagar</p>
                 <p id="paymentTotalPrice" class="text-4xl font-bold text-green-600 mb-6">S/ 0.00</p>
+            </div>
+
+            <div class="space-y-2 mb-6 bg-gray-50 p-4 rounded-lg">
+                <div>
+                    <label for="order-cash-received" class="block text-sm font-medium text-gray-600">Monto Recibido (S/)</label>
+                    <input type="number" id="order-cash-received" step="0.10" class="mt-1 block w-full text-right p-2 border rounded-lg text-lg font-bold" placeholder="Ej: 50.00">
+                </div>
+                <div class="flex justify-between items-center text-xl font-bold text-blue-600">
+                    <span>Vuelto a dar:</span>
+                    <span id="order-change-due">S/ 0.00</span>
+                </div>
             </div>
 
             <div class="space-y-4 text-left">
@@ -133,7 +135,6 @@
     </form>
 </div>
 
-<!-- Modal 3: Éxito y Acciones Finales (Diseño de referencia) -->
 <div id="actionsModal" class="modal fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
     <div class="bg-white rounded-lg shadow-2xl w-full max-w-md text-center p-8">
         <div class="text-green-500 mb-4"><i class="fas fa-check-circle fa-5x"></i></div>
@@ -170,6 +171,20 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('submit-order-btn').addEventListener('click', handleProceedToPayment);
     document.getElementById('confirmPriceBtn').addEventListener('click', handleCreateOrder);
     document.getElementById('submitPaymentBtn').addEventListener('click', handleSubmitPayment);
+    
+    // CÁLCULO DE VUELTO PARA PEDIDOS
+    document.getElementById('order-cash-received').addEventListener('input', function() {
+        const totalText = document.getElementById('paymentTotalPrice').textContent;
+        const totalAmount = parseFloat(totalText.replace('S/ ', '')) || 0;
+        const cashReceived = parseFloat(this.value) || 0;
+        
+        let change = cashReceived - totalAmount;
+        if (change < 0 || isNaN(change)) {
+            change = 0;
+        }
+        
+        document.getElementById('order-change-due').textContent = `S/ ${change.toFixed(2)}`;
+    });
 });
 
 function openModal(modalId) { document.getElementById(modalId).classList.remove('hidden'); }
@@ -233,6 +248,11 @@ async function handleCreateOrder() {
             currentOrderId = data.order_id;
             currentOrderCode = data.order_code;
             document.getElementById('paymentTotalPrice').textContent = `S/ ${parseFloat(data.total_price).toFixed(2)}`;
+            
+            // LIMPIAR CAMPOS DE VUELTO
+            document.getElementById('order-cash-received').value = '';
+            document.getElementById('order-change-due').textContent = 'S/ 0.00';
+
             closeModal('priceModal');
             openModal('paymentModal');
         } else {

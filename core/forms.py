@@ -121,13 +121,24 @@ class OrderCategoryInlineForm(forms.ModelForm):
 
 class CustomerFilterForm(forms.Form):
     """
-    Formulario completo para la lista de clientes, con todos los filtros.
+    Formulario con campos de búsqueda separados para clientes y pedidos.
     """
+    # Campo existente, ahora solo para datos del cliente
     search_query = forms.CharField(
         label="Buscar Cliente",
         required=False,
-        widget=forms.TextInput(attrs={'placeholder': 'Buscar por nombre, código o teléfono...'})
+        widget=forms.TextInput(attrs={'placeholder': 'Por nombre, código o teléfono...'})
     )
+
+    # --- CAMPO NUEVO AÑADIDO ---
+    # Nuevo campo exclusivo para buscar por número de pedido
+    order_query = forms.CharField(
+        label="Buscar por Pedido",
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Por N° o código de pedido...'})
+    )
+
+    # El resto de los campos de filtro no cambian
     order_status = forms.ChoiceField(
         choices=[('', 'Cualquier Estado de Pedido')] + Order.STATUS_CHOICES,
         required=False,

@@ -20,7 +20,6 @@
         </div>
     </div>
 
-    <!-- Tarjetas de Resumen Rápido -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-blue-500">
             <h3 class="text-sm font-medium text-slate-500">Clientes Nuevos (Este Mes)</h3>
@@ -38,18 +37,33 @@
     
     <div class="bg-white rounded-xl shadow-md">
         <div class="p-6">
-            <!-- Formulario de Filtros Avanzados -->
             <form method="get" class="mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
-                    <div class="lg:col-span-2">{{ customer_filter_form.search_query }}</div>
-                    <div>{{ customer_filter_form.order_status }}</div>
-                    <div>{{ customer_filter_form.payment_status }}</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                    
+                    <div class="lg:col-span-2">
+                        <label for="{{ customer_filter_form.search_query.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ customer_filter_form.search_query.label }}</label>
+                        {{ customer_filter_form.search_query }}
+                    </div>
+            
+                    <div>
+                        <label for="{{ customer_filter_form.order_query.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ customer_filter_form.order_query.label }}</label>
+                        {{ customer_filter_form.order_query }}
+                    </div>
+                    
+                    <div>
+                        <label for="{{ customer_filter_form.order_status.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ customer_filter_form.order_status.label }}</label>
+                        {{ customer_filter_form.order_status }}
+                    </div>
+                    <div>
+                        <label for="{{ customer_filter_form.payment_status.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ customer_filter_form.payment_status.label }}</label>
+                        {{ customer_filter_form.payment_status }}
+                    </div>
                 </div>
                 <div class="flex items-center gap-3 mt-4">
                     <button type="submit" class="bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-800 flex items-center justify-center">
                         <i class="fas fa-filter mr-2"></i> Filtrar
                     </button>
-                    {% if request.GET.search_query or request.GET.order_status or request.GET.payment_status %}
+                    {% if request.GET.search_query or request.GET.order_query or request.GET.order_status or request.GET.payment_status %}
                     <a href="{% url 'customer_list' %}" class="text-slate-600 hover:text-slate-900 text-sm font-medium">Limpiar filtros</a>
                     {% endif %}
                 </div>
@@ -71,7 +85,6 @@
                         <tr class="bg-white border-b hover:bg-slate-50">
                             <td class="px-6 py-4 font-medium text-slate-900">
                                 <div class="flex items-center gap-3">
-                                    <!-- Indicadores Visuales -->
                                     {% if customer.is_top %}<i class="fas fa-star text-yellow-400" title="Cliente Top"></i>{% endif %}
                                     {% if customer.is_inactive %}<i class="fas fa-circle text-red-500 text-xs" title="Cliente Inactivo"></i>{% endif %}
                                     <span>{{ customer.name }}</span>
@@ -101,7 +114,6 @@
                 </table>
             </div>
 
-            <!-- Paginación -->
             <nav class="flex justify-between items-center mt-6" aria-label="Paginación">
                 <div class="text-sm text-slate-500">
                     Mostrando <span class="font-semibold">{{ customers.start_index }}</span> a <span class="font-semibold">{{ customers.end_index }}</span> de <span class="font-semibold">{{ customers.paginator.count }}</span> clientes
